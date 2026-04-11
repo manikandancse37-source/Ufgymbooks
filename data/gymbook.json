@@ -1,0 +1,146 @@
+{
+  "gymInfo": {
+    "name": "DGYMBook Fitness Center",
+    "owner": "Manikandan",
+    "phone": "+91-9876543210",
+    "email": "info@dgymbook.com",
+    "address": "Chennai, Tamil Nadu, India",
+    "logo": "https://yourdomain.com/logo.png"
+  },
+
+  "users": [
+    {
+      "id": "U001",
+      "name": "Admin User",
+      "email": "admin@dgymbook.com",
+      "phone": "9876543210",
+      "role": "admin",
+      "password": "hashed_password_here",
+      "createdAt": "2026-02-20T10:00:00Z",
+      "status": "active"
+    }
+  ],
+
+  "members": [
+    {
+      "id": "M001",
+      "name": "Arun Kumar",
+      "phone": "9000000001",
+      "email": "arun@gmail.com",
+      "gender": "Male",
+      "dob": "1998-05-10",
+      "height": 172,
+      "weight": 75,
+      "joinDate": "2026-02-01",
+      "planId": "P001",
+      "trainerId": "T001",
+      "status": "active",
+      "photo": "https://yourdomain.com/members/arun.jpg"
+    }
+  ],
+
+  "trainers": [
+    {
+      "id": "T001",
+      "name": "Rahul Trainer",
+      "phone": "9000000002",
+      "specialization": "Weight Loss",
+      "experience": 5,
+      "salary": 25000,
+      "status": "active"
+    }
+  ],
+
+  "plans": [
+    {
+      "id": "P001",
+      "name": "Monthly Plan",
+      "durationInDays": 30,
+      "price": 1500,
+      "description": "Access to gym for 1 month",
+      "features": [
+        "Cardio",
+        "Strength Training",
+        "Locker Access"
+      ]
+    }
+  ],
+
+  "payments": [
+    {
+      "id": "PAY001",
+      "memberId": "M001",
+      "planId": "P001",
+      "amount": 1500,
+      "paymentMethod": "UPI",
+      "paymentDate": "2026-02-01",
+      "nextDueDate": "2026-03-01",
+      "status": "paid"
+    }
+  ],
+
+  "attendance": [
+    {
+      "id": "ATT001",
+      "memberId": "M001",
+      "date": "2026-02-22",
+      "checkIn": "06:30 AM",
+      "checkOut": "08:00 AM"
+    }
+  ],
+
+  "workoutPlans": [
+    {
+      "id": "W001",
+      "memberId": "M001",
+      "trainerId": "T001",
+      "schedule": [
+        {
+          "day": "Monday",
+          "exercise": "Chest + Triceps",
+          "details": "Bench Press 3x12, Pushups 3x15"
+        },
+        {
+          "day": "Tuesday",
+          "exercise": "Back + Biceps",
+          "details": "Pullups 3x10, Barbell Curl 3x12"
+        }
+      ]
+    }
+  ],
+
+  "dietPlans": [
+    {
+      "id": "D001",
+      "memberId": "M001",
+      "calories": 2200,
+      "meals": [
+        {
+          "time": "Breakfast",
+          "items": ["Oats", "Egg Whites", "Banana"]
+        },
+        {
+          "time": "Lunch",
+          "items": ["Brown Rice", "Chicken Breast", "Salad"]
+        }
+      ]
+    }
+  ],
+
+  "expenses": [
+    {
+      "id": "E001",
+      "title": "Electricity Bill",
+      "amount": 4500,
+      "date": "2026-02-10",
+      "category": "Utilities"
+    }
+  ],
+
+  "dashboard": {
+    "totalMembers": 120,
+    "activeMembers": 98,
+    "monthlyRevenue": 150000,
+    "pendingPayments": 12
+  }
+}
