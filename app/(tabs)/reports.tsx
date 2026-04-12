@@ -1,83 +1,220 @@
-import React from "react";
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+import React, { useEffect, useState } from "react";
+import { Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+
 import AppHeader from '../../components/AppHeader';
+import DateRangePickerNative from '../../components/DateRangePickerNative';
+import DateRangePickerWeb from '../../components/DateRangePickerWeb';
+import { supabase } from '../../lib/supabaseClient';
+
 
 const ReportsScreen: React.FC = () => {
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [totalTransactions, setTotalTransactions] = useState(0);
+  const [loading, setLoading] = useState(false);
+  // For web
+  const [range, setRange] = useState([
+    {
+      startDate: new Date(),
+      endDate: new Date(),
+      key: 'selection',
+    },
+  ]);
+  // For native
+  const [fromDate, setFromDate] = useState<Date | null>(null);
+  const [toDate, setToDate] = useState<Date | null>(null);
+  const [showFrom, setShowFrom] = useState(false);
+  const [showTo, setShowTo] = useState(false);
+  // Picker visibility (for inline web picker)
+  const [showPicker, setShowPicker] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const { startDate, endDate } = range[0];
+      if (startDate && endDate) {
+        fetchTotalRevenueWeb(startDate, endDate);
+      }
+    } else {
+      if (fromDate && toDate) {
+        fetchTotalRevenueNative(fromDate, toDate);
+      }
+    }
+    // eslint-disable-next-line
+  }, [range, fromDate, toDate]);
+
+  const fetchTotalRevenueWeb = async (fromDate: Date, toDate: Date) => {
+    setLoading(true);
+    const from = fromDate.toISOString().slice(0, 10);
+    const to = toDate.toISOString().slice(0, 10);
+    const { data, error } = await supabase.rpc('fn_total_revenue_datewise', {
+      in_from_date: from,
+      in_to_date: to,
+    });
+    if (!error && data && data.length > 0) {
+      setTotalRevenue(data.total_revenue || 0);
+      setTotalTransactions(data.total_transactions || 0);
+    } else {
+      setTotalRevenue(data?.total_revenue || 0);
+      setTotalTransactions(data?.total_transactions || 0);
+    }
+    setLoading(false);
+  };
+
+  const fetchTotalRevenueNative = async (fromDate: Date, toDate: Date) => {
+    setLoading(true);
+    const from = fromDate.toISOString().slice(0, 10);
+    const to = toDate.toISOString().slice(0, 10);
+    const { data, error } = await supabase.rpc('fn_total_revenue_datewise', {
+      in_from_date: from,
+      in_to_date: to,
+    });
+    if (!error && data && data.length > 0) {
+      setTotalRevenue(data.total_revenue || 0);
+      setTotalTransactions(data.total_transactions || 0);
+    } else {
+      setTotalRevenue(data?.total_revenue || 0);
+      setTotalTransactions(data?.total_transactions || 0);
+    }
+    setLoading(false);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <AppHeader title="Reports" showSettings showCall onSettingsPress={() => {}} onCallPress={() => {}} />
 
-      {/* Filters */}
-      <View style={styles.filters}>
-        <View style={styles.filterPill}>
-          <Text style={styles.filterText}>Today</Text>
-        </View>
-        <View style={styles.filterPill}>
-          <Text style={styles.filterText}>Payment type: All</Text>
-        </View>
-        <TouchableOpacity style={styles.filterIcon}>
-          <Text style={{ fontSize: 16 }}>🎚️</Text>
-        </TouchableOpacity>
+
+      {/* Filter row: Date range textbox left, filter icon right */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8 }}>
+        {Platform.OS === 'web' ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <View style={{ position: 'relative', flex: 1 }}>
+              <TextInput
+                style={[
+                  styles.filterPill,
+                  styles.dateInput,
+                  {
+                    paddingLeft: 38,
+                    height: 44,
+                    borderRadius: 32,
+                    borderColor: '#C7D0E0',
+                    borderWidth: 1.5,
+                    fontSize: 16,
+                    fontWeight: '500',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                    width: '100%',
+                    paddingRight: 18,
+                  },
+                ]}
+                placeholder="YYYY-MM-DD to YYYY-MM-DD"
+                value={
+                  range[0].startDate && range[0].endDate
+                    ? `${range[0].startDate.toISOString().slice(0, 10)} to ${range[0].endDate.toISOString().slice(0, 10)}`
+                    : ''
+                }
+                onFocus={() => setShowPicker(true)}
+                onChangeText={val => {
+                  const match = val.match(/(\d{4}-\d{2}-\d{2})\s*to\s*(\d{4}-\d{2}-\d{2})/);
+                  if (match) {
+                    setRange([{ ...range[0], startDate: new Date(match[1]), endDate: new Date(match[2]) }]);
+                  }
+                }}
+              />
+              <View style={{ position: 'absolute', left: 12, top: 10 }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6C7A96" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="4"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.filterIcon}>
+              <Text style={{ fontSize: 20 }}>🎚️</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.filterIcon} onPress={() => setShowPicker(true)}>
+            <Text style={{ fontSize: 20 }}>🎚️</Text>
+          </TouchableOpacity>
+        )}
       </View>
+
+
+      {/* Inline Date Range Picker for web */}
+      {Platform.OS === 'web' && showPicker && (
+        <View
+          style={{
+            position: 'absolute',
+            left: 32,
+            top: 110,
+            width: 340,
+            backgroundColor: '#fff',
+            borderRadius: 14,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.13)',
+            borderWidth: 0,
+            zIndex: 100,
+            padding: 12,
+          }}
+        >
+          <View style={{ alignItems: 'flex-end', marginBottom: 2 }}>
+            <TouchableOpacity onPress={() => setShowPicker(false)} style={{ padding: 2, borderRadius: 12, backgroundColor: '#f2f2f2', width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 18, color: '#888' }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <DateRangePickerWeb range={range} setRange={setRange} />
+        </View>
+      )}
+
+      {/* Native Date Picker logic unchanged, still modal if needed */}
+      {Platform.OS !== 'web' && showPicker && (
+        <Modal
+          visible={showPicker}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowPicker(false)}
+        >
+          <View style={styles.overlayBg}>
+            <View style={styles.overlayContent}>
+              <TouchableOpacity style={styles.closeBtn} onPress={() => setShowPicker(false)}>
+                <Text style={{ fontSize: 22 }}>✕</Text>
+              </TouchableOpacity>
+              <DateRangePickerNative
+                fromDate={fromDate}
+                toDate={toDate}
+                setFromDate={setFromDate}
+                setToDate={setToDate}
+                showFrom={showFrom}
+                setShowFrom={setShowFrom}
+                showTo={showTo}
+                setShowTo={setShowTo}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Stats cards */}
         <View style={styles.row}>
           <View style={styles.smallCard}>
-            <Text style={styles.cardLabel}>New Members</Text>
-            <Text style={styles.cardValue}>65</Text>
+            <Text style={styles.cardLabel}>Total Transactions</Text>
+            <Text style={styles.cardValue}>{loading ? 'Loading...' : totalTransactions}</Text>
           </View>
           <View style={styles.smallCard}>
-            <Text style={styles.cardLabel}>All-time Balance</Text>
-            <Text style={styles.cardValue}>₹0</Text>
+            <Text style={styles.cardLabel}>Total Revenue</Text>
+            <Text style={styles.cardValue}>{loading ? 'Loading...' : `₹${totalRevenue}`}</Text>
           </View>
         </View>
 
-        {/* Total Revenue */}
+        {/* Total Revenue (detailed) */}
         <View style={styles.largeCard}>
           <View style={styles.spaceBetween}>
             <Text style={styles.cardLabel}>Total Revenue</Text>
-            <Text style={styles.greenValue}>₹0</Text>
+            <Text style={styles.greenValue}>{loading ? 'Loading...' : `₹${totalRevenue}`}</Text>
           </View>
-
           <View style={styles.divider} />
-
           <View style={styles.spaceBetween}>
-            <Text style={styles.subLabel}>Memberships</Text>
-            <Text style={styles.subLabel}>₹0</Text>
-          </View>
-
-          <View style={styles.spaceBetween}>
-            <Text style={styles.subLabel}>Expenses</Text>
-            <Text style={styles.subLabel}>₹0</Text>
+            <Text style={styles.subLabel}>Total Transactions</Text>
+            <Text style={styles.subLabel}>{loading ? 'Loading...' : totalTransactions}</Text>
           </View>
         </View>
 
-        {/* Memberships */}
-        <View style={styles.listCard}>
-          <View style={styles.spaceBetween}>
-            <Text style={styles.cardLabel}>Memberships</Text>
-            <Text style={styles.arrow}>›</Text>
-          </View>
-
-          <Text style={styles.cardValue}>₹0</Text>
-
-          <Text style={styles.subtleText}>Memberships by Plan</Text>
-          <Text style={styles.noData}>No data available</Text>
-        </View>
-
-        {/* Expenses */}
-        <View style={styles.listCard}>
-          <View style={styles.spaceBetween}>
-            <Text style={styles.cardLabel}>Expenses</Text>
-            <Text style={styles.arrow}>›</Text>
-          </View>
-
-          <Text style={styles.cardValue}>₹0</Text>
-          <Text style={styles.subtleText}>Memberships by Plan</Text>
-          <Text style={styles.noData}>No data available</Text>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -140,6 +277,20 @@ const styles = StyleSheet.create({
     marginLeft: "auto",
     padding: 6,
   },
+  dateInput: {
+    flex: 1,
+    textAlign: 'center',
+    minWidth: 120,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    fontSize: 15,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#DDD',
+    borderRadius: 20,
+    marginHorizontal: 2,
+  },
+
 
   row: {
     flexDirection: "row",
@@ -264,5 +415,28 @@ const styles = StyleSheet.create({
   },
   activeText: {
     color: "#0B2A5B",
+  },
+  overlayBg: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  overlayContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 2,
+    padding: 8,
   },
 });

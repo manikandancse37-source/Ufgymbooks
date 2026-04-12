@@ -1,15 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { format } from 'date-fns';
+// @ts-ignore
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
+import { DateRange } from 'react-date-range';
 import {
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from "../../lib/supabaseClient";
@@ -20,6 +24,20 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [birthdays, setBirthdays] = useState<any[]>([]);
   const [loadingBirthdays, setLoadingBirthdays] = useState(false);
+  const [quickReports, setQuickReports] = useState<any>(null);
+  const [loadingQuickReports, setLoadingQuickReports] = useState(false);
+  const [fromDate, setFromDate] = useState<Date>(new Date());
+  const [toDate, setToDate] = useState<Date>(new Date());
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
+  const [showWebRange, setShowWebRange] = useState(false);
+  const [range, setRange] = useState([
+    {
+      startDate: fromDate,
+      endDate: toDate,
+      key: 'selection',
+    },
+  ]);
 
   const navigate = (path: string, params?: Record<string, string>) => {
     router.push({ pathname: path as any, params });
@@ -29,8 +47,48 @@ export default function HomeScreen() {
     useCallback(() => {
       fetchDashboard();
       fetchBirthdays();
-    }, [])
+      fetchQuickReports(fromDate, toDate);
+    }, [fromDate, toDate])
   );
+  // Keep range state in sync with fromDate/toDate (for web picker)
+  React.useEffect(() => {
+    setRange([{ startDate: fromDate, endDate: toDate, key: 'selection' }]);
+  }, [fromDate, toDate]);
+  const fetchQuickReports = async (from?: Date, to?: Date) => {
+    setLoadingQuickReports(true);
+    let params = {};
+    if (from && to) {
+      params = {
+        in_from_date: from.toISOString().split('T')[0],
+        in_to_date: to.toISOString().split('T')[0],
+      };
+    }
+    // Fetch quick reports as before
+    const { data, error } = await supabase.rpc("fn_quick_reports_v1", params);
+    // Fetch all time balance using the required method
+    let allTimeBalance = null;
+    try {
+      const { data: balanceData, error: balanceError } = await supabase.rpc("fn_member_balance_report", params);
+      if (!balanceError && balanceData && Array.isArray(balanceData) && balanceData.length > 0) {
+        allTimeBalance = balanceData[0].balance ?? null;
+      }
+    } catch (e) {
+      // ignore
+    }
+    if (error) {
+      console.log("Quick Reports error:", error);
+      setQuickReports(null);
+      setLoadingQuickReports(false);
+      return;
+    }
+    // Merge All Time Balance into quickReports
+    let quick = data || {};
+    if (allTimeBalance !== null) {
+      quick["All Time Balance"] = `₹${allTimeBalance}`;
+    }
+    setQuickReports(quick);
+    setLoadingQuickReports(false);
+  };
 
   const fetchDashboard = async () => {
     setLoading(true);
@@ -129,7 +187,7 @@ export default function HomeScreen() {
                   <Text style={{ fontSize: 15, fontWeight: "600" }}>{b.name}</Text>
                   <Text style={{ color: "#64748B", fontSize: 13 }}>DOB: {b.date_of_birth}</Text>
                 </View>
-                <Ionicons name="cake-outline" size={28} color="#F59E0B" style={{ marginLeft: 8 }} />
+                <Ionicons name="cafe-outline" size={28} color="#F59E0B" style={{ marginLeft: 8 }} />
               </View>
             ))
           )}
@@ -159,6 +217,146 @@ export default function HomeScreen() {
             <ReportItem label="Total Revenue" value="₹1,000" />
           </View>
         </View> */}
+        <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
+          <Text style={{ color: '#2563EB', fontWeight: '700', fontSize: 15, marginBottom: 8 }}>Quick Reports</Text>
+          {/* Date Range Picker UI */}
+          {Platform.OS === 'web' ? (
+            <View style={{ marginBottom: 8 }}>
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, padding: 8, borderWidth: 1, borderColor: '#E5E7EB' }}
+                onPress={() => setShowWebRange(true)}
+              >
+                <Ionicons name="calendar-outline" size={20} color="#0A1E5C" style={{ marginRight: 8 }} />
+                <Text style={{ color: '#0A1E5C', fontWeight: '600', fontSize: 15 }}>
+                  {format(fromDate, 'yyyy-MM-dd')} to {format(toDate, 'yyyy-MM-dd')}
+                </Text>
+              </TouchableOpacity>
+              {showWebRange && (
+                <View style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  width: '100vw',
+                  height: '100vh',
+                  backgroundColor: 'rgba(0,0,0,0.15)',
+                  zIndex: 1000,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <View style={{ position: 'relative', backgroundColor: '#fff', borderRadius: 16, padding: 0, minWidth: 340, boxShadow: '0 2px 8px rgba(0,0,0,0.10)' }}>
+                    <TouchableOpacity
+                      style={{ position: 'absolute', top: 10, right: 10, zIndex: 10 }}
+                      onPress={() => setShowWebRange(false)}
+                    >
+                      <Ionicons name="close" size={24} color="#222" />
+                    </TouchableOpacity>
+                    {/* Quick Reports Card removed, only calendar below */}
+                    {/* Calendar below */}
+                    <View style={{ backgroundColor: '#fff', borderBottomLeftRadius: 16, borderBottomRightRadius: 16, padding: 8 }}>
+                      <DateRange
+                        editableDateInputs={true}
+                        onChange={item => {
+                          setRange([item.selection]);
+                          setFromDate(item.selection.startDate);
+                          setToDate(item.selection.endDate);
+                        }}
+                        moveRangeOnFirstSelection={false}
+                        ranges={range}
+                        maxDate={new Date()}
+                      />
+                    </View>
+                  </View>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <TouchableOpacity onPress={() => setShowFromPicker(true)} style={{ marginRight: 8, backgroundColor: '#F3F4F6', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Text style={{ color: '#222', fontSize: 13 }}>From: {fromDate.toLocaleDateString()}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowToPicker(true)} style={{ backgroundColor: '#F3F4F6', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Text style={{ color: '#222', fontSize: 13 }}>To: {toDate.toLocaleDateString()}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {Platform.OS !== 'web' && showFromPicker && (
+            <DateTimePicker
+              value={fromDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event, selectedDate) => {
+                setShowFromPicker(false);
+                if (selectedDate) setFromDate(selectedDate);
+              }}
+              maximumDate={toDate}
+            />
+          )}
+          {Platform.OS !== 'web' && showToPicker && (
+            <DateTimePicker
+              value={toDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event, selectedDate) => {
+                setShowToPicker(false);
+                if (selectedDate) setToDate(selectedDate);
+              }}
+              minimumDate={fromDate}
+              maximumDate={new Date()}
+            />
+          )}
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, marginTop: 2, borderWidth: 1, borderColor: '#E5E7EB' }}>
+            {loadingQuickReports ? (
+              <Text style={{ color: '#64748B', textAlign: 'center', marginVertical: 16 }}>Loading...</Text>
+            ) : quickReports ? (
+              <>
+                <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <TouchableOpacity onPress={() =>
+                      router.push({
+                        pathname: "/memberDetailsRange",
+                        params: {
+                          fromDate: fromDate.toISOString().slice(0, 10),
+                          toDate: toDate.toISOString().slice(0, 10),
+                        },
+                      })
+                    }>
+                      <Text style={{ color: '#64748B', fontSize: 13, textDecorationLine: 'underline' }}>New Members</Text>
+                      <Text style={{ color: '#222', fontWeight: '700', fontSize: 20, marginTop: 2 }}>{quickReports["New Members"] ?? '--'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <TouchableOpacity onPress={() =>
+                      router.push({
+                        pathname: "/(tabs)/member",
+                        params: { userId: "1" }
+                      })
+                    }>
+                      <Text style={{ color: '#64748B', fontSize: 13, textDecorationLine: 'underline' }}>Total Members</Text>
+                      <Text style={{ color: '#222', fontWeight: '700', fontSize: 20, marginTop: 2 }}>{quickReports["Total Members"] ?? '--'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row' }}>
+                  <View style={{ flex: 1 }}>
+                    <TouchableOpacity onPress={() => navigate("/allTimeBalanceReport", { fromDate: fromDate.toISOString().split('T')[0], toDate: toDate.toISOString().split('T')[0] })}>
+                      <Text style={{ color: '#64748B', fontSize: 13, textDecorationLine: 'underline' }}>All Time Balance</Text>
+                      <Text style={{ color: '#222', fontWeight: '700', fontSize: 20, marginTop: 2 }}>{quickReports["All Time Balance"] ?? '--'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <TouchableOpacity onPress={() => navigate("/(tabs)/reports")}> 
+                      <Text style={{ color: '#64748B', fontSize: 13, textDecorationLine: 'underline' }}>Total Revenue</Text>
+                      <Text style={{ color: '#222', fontWeight: '700', fontSize: 20, marginTop: 2 }}>{quickReports["Total Revenue"] ?? '--'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </>
+            ) : (
+              <Text style={{ color: '#64748B', textAlign: 'center', marginVertical: 16 }}>No data available.</Text>
+            )}
+          </View>
+        </View>
 
         {/* Members with balance */}
         {/* <View style={styles.balanceCard}>

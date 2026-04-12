@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, FlatList, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import { supabase } from "../../lib/supabaseClient";
@@ -22,7 +22,19 @@ export default function MemberScreen() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
-
+  const [selectedDateRange, setSelectedDateRange] = useState<{ start: string; end: string } | null>(null);
+  // Date range state
+  const [range, setRange] = useState([
+    {
+      startDate: new Date(),
+      endDate: new Date(),
+      key: 'selection',
+    },
+  ]);
+  const [fromDate, setFromDate] = useState(new Date());
+  const [toDate, setToDate] = useState(new Date());
+  const [showFrom, setShowFrom] = useState(false);
+  const [showTo, setShowTo] = useState(false);
 
   const fetchMembers = useCallback(async () => {
     setLoading(true);
@@ -41,6 +53,7 @@ export default function MemberScreen() {
       setLoading(false);
       return;
     }
+    console.log(data);
     const formattedData: Member[] = (apiResponse.data || []).map((item: any) => ({
       id: String(item.member_id),
       name: `${item.first_name} ${item.last_name}`,
@@ -48,7 +61,7 @@ export default function MemberScreen() {
       phone: item.phone_number,
       plan: "One month plan",
       expired: new Date(item.expiry_date) < new Date(),
-      avatar: item.avatar_url || "https://i.pravatar.cc/150", // Use user's image if available
+      avatar: item.profile_image || null, // Use user's image if available, else null
       expiryDate: item.expiry_date,
     }));
     setMembers(formattedData);
@@ -58,6 +71,41 @@ export default function MemberScreen() {
     if (!userId) return;
     fetchMembers();
   }, [userId, fetchMembers]);
+  const fetchMembersByDate = useCallback(async (start: Date, end: Date) => {
+    setLoading(true);
+    const { data, error } = await supabase.rpc(
+      "ufn_get_members_by_date",
+      {
+        in_from_date: start.toISOString().slice(0, 10),
+        in_to_date: end.toISOString().slice(0, 10),
+        in_type: Number(userId)
+      }
+    );
+    if (error) {
+      console.log("Error:", error);
+      setMembers([]);
+      setLoading(false);
+      return;
+    }
+    const apiResponse = data;
+    if (apiResponse?.status !== 1) {
+      setMembers([]);
+      setLoading(false);
+      return;
+    }
+    const formattedData: Member[] = (apiResponse.data || []).map((item: any) => ({
+      id: String(item.member_id),
+      name: `${item.first_name} ${item.last_name}`,
+      code: `#${item.member_code}`,
+      phone: item.phone_number,
+      plan: "One month plan",
+      expired: new Date(item.expiry_date) < new Date(),
+      avatar: item.profile_image || "https://i.pravatar.cc/150",
+      expiryDate: item.expiry_date,
+    }));
+    setMembers(formattedData);
+    setLoading(false);
+  }, [userId]);
   const filteredMembers = members
     .filter(member =>
       member.name.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -75,7 +123,20 @@ export default function MemberScreen() {
       }
     >
       <View style={styles.card}>
-        <Image source={{ uri: item.avatar }} style={styles.avatar} />
+        {item.avatar ? (
+          <Image
+            source={{
+              uri: item.avatar.startsWith('data:image')
+                ? item.avatar
+                : item.avatar.match(/^[A-Za-z0-9+/=]+$/)
+                  ? `data:image/png;base64,${item.avatar}`
+                  : item.avatar
+            }}
+            style={styles.avatar}
+          />
+        ) : (
+          <Text style={{ fontSize: 20, color: '#64748B' }}>👤</Text>
+        )}
         <View style={{ flex: 1 }}>
           <Text style={styles.name}>
             {item.name} <Text style={styles.code}>{item.code}</Text>
@@ -96,48 +157,54 @@ export default function MemberScreen() {
     </TouchableOpacity>
   );
 
+  const handleDateChange = (date: { start: string; end: string } | null) => {
+    setSelectedDateRange(date);
+  };
+
+  // Handle date range change
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const { startDate, endDate } = range[0];
+      if (startDate && endDate) {
+        fetchMembersByDate(startDate, endDate);
+      }
+    } else {
+      if (fromDate && toDate) {
+        fetchMembersByDate(fromDate, toDate);
+      }
+    }
+    // eslint-disable-next-line
+  }, [range, fromDate, toDate]);
+
   return (
     <View style={{ flex: 1, backgroundColor: '#F6F8FB' }}>
       {/* Fixed Header */}
       <AppHeader title="Members" showSettings onSettingsPress={() => router.push('/(tabs)/profile')} showCall onCallPress={() => {}} />
       {/* Scrollable Content */}
       <View style={{ flex: 1 }}>
-        <FlatList
-          data={filteredMembers}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          ListHeaderComponent={
-            <>
-              <View style={styles.searchRow}>
-                <TextInput
-                  placeholder="Search for name or phone"
-                  placeholderTextColor="#9AA4B2"
-                  style={styles.searchInput}
-                  value={searchText}
-                  onChangeText={setSearchText}
-                />
-                <TouchableOpacity style={styles.squareBtn} onPress={() => router.push("/(tabs)/addMember")}> 
-                  <Text style={styles.squareBtnText}>＋</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.squareBtnOutline} />
-              </View>
-              <View style={styles.filterRow}>
-                <View style={styles.filterChip}>
-                  <Text style={styles.filterText}>Expired in last 30 days</Text>
-                </View>
-                <View style={styles.filterChip}>
-                  <Text style={styles.filterText}>Sorted By Expiry - Desc</Text>
-                </View>
-              </View>
-              <Text style={styles.showing}>
-                {loading ? "Loading..." : `Showing ${filteredMembers.length} Members`}
-              </Text>
-              {loading && <ActivityIndicator size="large" style={{ marginTop: 40 }} />}
-            </>
-          }
-          contentContainerStyle={{ paddingBottom: 120 }}
-          showsVerticalScrollIndicator={false}
-        />
+        {filteredMembers.length === 0 && !loading ? (
+          <View style={{ alignItems: 'center', marginTop: 48 }}>
+            <Text style={{ color: '#6c7587', fontSize: 18, fontWeight: '500' }}>No records found</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredMembers}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            ListHeaderComponent={
+              <>
+                {/* Search bar and + button removed as requested */}
+                {/* Removed filter chips as requested */}
+                <Text style={styles.showing}>
+                  {loading ? "Loading..." : `Showing ${filteredMembers.length} Members`}
+                </Text>
+                {loading && <ActivityIndicator size="large" style={{ marginTop: 40 }} />}
+              </>
+            }
+            contentContainerStyle={{ paddingBottom: 120 }}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
       </View>
       {/* Fixed Footer */}
       <BottomNav />
@@ -171,8 +238,7 @@ const styles = StyleSheet.create({
 
   searchInput: {
     flex: 1,
-    height: 44,
-    borderRadius: 12,
+    // height, borderRadius, etc. overridden inline for pill look
     backgroundColor: "#FFFFFF",
     paddingHorizontal: 14,
   },
@@ -191,13 +257,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
 
-  squareBtnOutline: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: "#CBD5E1",
-  },
 
   filterRow: {
     flexDirection: "row",

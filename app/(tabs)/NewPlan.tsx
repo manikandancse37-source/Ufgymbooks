@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { SafeAreaView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { supabase } from '../../lib/supabaseClient';
 
 const NewPlanScreen: React.FC = () => {
   const router = useRouter();
@@ -10,8 +11,6 @@ const NewPlanScreen: React.FC = () => {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [duration, setDuration] = useState('');
-  const [enableSessions, setEnableSessions] = useState(true);
-  const [sessions, setSessions] = useState('');
 
   const GroupButton = ({ label }: { label: typeof planGroup }) => {
     const active = planGroup === label;
@@ -36,6 +35,26 @@ const NewPlanScreen: React.FC = () => {
     );
   };
 
+  const handleSave = async () => {
+    if (!name || !amount || !duration) {
+      Alert.alert('Validation', 'Please fill all required fields.');
+      return;
+    }
+    
+    const { data,error } = await supabase.rpc('ufn_insert_membership_type', {
+      in_membership_name: name,
+      in_duration_days: parseInt(duration, 10),
+      in_amount: parseFloat(amount)
+    });
+    console.log(data);
+    if (error) {
+      Alert.alert('Error', error.message);
+    } else {
+      alert('Success');
+      router.back();
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -49,73 +68,56 @@ const NewPlanScreen: React.FC = () => {
         <View style={styles.headerSide} />
       </View>
 
-      {/* Content */}
-      <View style={styles.content}>
-        <Text style={styles.label}>Plan Group</Text>
-        <View style={styles.groupContainer}>
-          <GroupButton label="Main" />
-          <GroupButton label="Personal Training" />
-          <GroupButton label="New" />
-        </View>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }} keyboardShouldPersistTaps="handled">
+          <View style={styles.content}>
+            <Text style={styles.label}>Plan Group</Text>
+            <View style={styles.groupContainer}>
+              <GroupButton label="Main" />
+              <GroupButton label="Personal Training" />
+              <GroupButton label="New" />
+            </View>
 
-        <Text style={styles.label}>Name</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter Plan Name"
-          placeholderTextColor="#9CA3AF"
-          value={name}
-          onChangeText={setName}
-        />
-
-        <Text style={styles.label}>Amount</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter Plan Amount"
-          placeholderTextColor="#9CA3AF"
-          keyboardType="numeric"
-          value={amount}
-          onChangeText={setAmount}
-        />
-
-        <Text style={styles.label}>Duration (in days)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter Plan Duration"
-          placeholderTextColor="#9CA3AF"
-          keyboardType="numeric"
-          value={duration}
-          onChangeText={setDuration}
-        />
-
-        <View style={styles.switchRow}>
-          <Text style={styles.label}>Enable Sessions</Text>
-          <Switch
-            value={enableSessions}
-            onValueChange={setEnableSessions}
-            trackColor={{ false: '#D1D5DB', true: '#1E3A8A' }}
-            thumbColor="#FFFFFF"
-          />
-        </View>
-
-        {enableSessions && (
-          <>
-            <Text style={styles.label}>Sessions</Text>
+            <Text style={styles.label}>Name</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter Number of Sessions"
+              placeholder="Enter Plan Name"
+              placeholderTextColor="#9CA3AF"
+              value={name}
+              onChangeText={setName}
+            />
+
+            <Text style={styles.label}>Amount</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter Plan Amount"
               placeholderTextColor="#9CA3AF"
               keyboardType="numeric"
-              value={sessions}
-              onChangeText={setSessions}
+              value={amount}
+              onChangeText={setAmount}
             />
-          </>
-        )}
-      </View>
 
-      {/* Save Button */}
-      <TouchableOpacity style={styles.saveButton}>
-        <Text style={styles.saveButtonText}>Save</Text>
-      </TouchableOpacity>
+            <Text style={styles.label}>Duration (in days)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter Plan Duration"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="numeric"
+              value={duration}
+              onChangeText={setDuration}
+            />
+
+            {/* Sessions and Enable Sessions removed for simpler design, like Add Member page */}
+            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+              <Text style={styles.saveButtonText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -206,7 +208,9 @@ const styles = StyleSheet.create({
   /* Save Button */
   saveButton: {
     height: 56,
-    margin: 16,
+    marginHorizontal: 16,
+    marginBottom: 32,
+    marginTop: 16,
     borderRadius: 10,
     backgroundColor: '#0B1D4D',
     justifyContent: 'center',

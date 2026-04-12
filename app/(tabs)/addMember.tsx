@@ -35,6 +35,7 @@ const INITIAL_FORM = {
   emgName:   "",
   emgPhone:  "",
   avatarUrl: "",
+  amount:    "",
 };
 
 /* ── Reusable field component ── */
@@ -172,7 +173,9 @@ export default function AddMemberScreen() {
 
       /* Membership types */
       if (!membershipRes.error && membershipRes.data) {
+        console.log(membershipRes.data);
         setMembershipData(membershipRes.data);
+        console.log("Membership Data:", membershipRes.data); // DEBUG: See property names
       }
     })();
   }, []);
@@ -196,7 +199,7 @@ export default function AddMemberScreen() {
   /* ── Validation ── */
   const validate = useCallback(() => {
     const { name, lastName, phone, email, address, city,
-            stateName, pincode, height, weight, emgName, emgPhone } = form;
+            stateName, pincode, height, weight, emgName, emgPhone, amount } = form;
 
     if (!name) { alert("First name is required"); return false; }
     if (!lastName) { alert("Last name is required"); return false; }
@@ -214,6 +217,7 @@ export default function AddMemberScreen() {
     if (!emgPhone) { alert("Emergency phone is required"); return false; }
     if (emgPhone.length < 10) { alert("Emergency phone must be at least 10 digits"); return false; }
     if (isCustomDuration && !customDays) { alert("Enter number of days"); return false; }
+    if (!amount) { alert("Amount is required"); return false; }
     return true;
   }, [form, membershipType, isCustomDuration, customDays]);
 
@@ -243,7 +247,7 @@ export default function AddMemberScreen() {
         ? Number(customDays)
         : selectedPlan?.duration_days;
 
-      const { error } = await supabase.rpc("ufn_create_member_v2", {
+      const { data,error } = await supabase.rpc("ufn_create_member_v3", {
         in_applicationuserid: userIdNumber,
         in_first_name:        form.name,
         in_last_name:         form.lastName,
@@ -261,11 +265,31 @@ export default function AddMemberScreen() {
         in_emg_name:          form.emgName,
         in_emg_phone:         form.emgPhone,
         in_profile_image:     avatarBase64String || null,
+        in_amount:            form.amount ? Number(form.amount) : null,
       });
 
       if (error) throw error;
-
-      alert("Member Added Successfully");
+      console.log({
+        in_applicationuserid: userIdNumber,
+        in_first_name:        form.name,
+        in_last_name:         form.lastName,
+        in_gender:            form.gender,
+        in_dob:               form.dob || null,
+        in_phone:             form.phone,
+        in_email:             form.email,
+        in_address:           form.address,
+        in_city:              form.city,
+        in_state:             form.stateName,
+        in_pincode:           form.pincode,
+        in_membership_type:   durationDays,
+        in_height:            form.height ? Number(form.height) : null,
+        in_weight:            form.weight ? Number(form.weight) : null,
+        in_emg_name:          form.emgName,
+        in_emg_phone:         form.emgPhone,
+        in_profile_image:     avatarBase64String || null,
+        in_amount:            form.amount ? Number(form.amount) : null,
+      });
+      alert(data.message);
       setForm({ ...INITIAL_FORM });   // ← reset all text fields
       setAvatar(null);
 
@@ -273,7 +297,7 @@ export default function AddMemberScreen() {
       setCustomDays("");              // ← reset custom days
       setAvatar(null);
       setAvatarBase64(null);
-      router.back();
+      router.replace({ pathname: "/(tabs)", params: { refresh: "1" } });
 
     } catch (err: any) {
       alert(err.message);
@@ -431,7 +455,15 @@ export default function AddMemberScreen() {
             </View>
             <View style={styles.dropdownWrapper}>
               <RNPickerSelect
-                onValueChange={setMembershipType}
+                onValueChange={val => {
+                  setMembershipType(val);
+                  const selected = membershipData.find(item => item.duration_days === val);
+                  if (selected && selected.entry_fee) {
+                    setForm(prev => ({ ...prev, amount: String(selected.entry_fee) }));
+                  } else {
+                    setForm(prev => ({ ...prev, amount: "" }));
+                  }
+                }}
                 items={membershipOptions}
                 value={membershipType}
                 style={{
@@ -454,6 +486,14 @@ export default function AddMemberScreen() {
             )}
             <View style={styles.divider} />
 
+            {/* Section: Amount */}
+            <Field
+              placeholder="Amount"
+              value={form.amount}
+              onChangeText={set("amount")}
+              keyboardType="numeric"
+              maxLength={8}
+            />
             {/* Section: Health */}
             <Text style={styles.sectionTitle}>Health</Text>
             <Field
