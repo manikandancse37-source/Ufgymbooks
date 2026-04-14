@@ -171,14 +171,15 @@ export default function TransactionsScreen() {
                   )}
                   <View style={styles.nameBlock}>
                     <Text style={styles.name}>{item.name || item.member_id}</Text>
+                    <Text style={styles.name}>{ item.phone}</Text>
                     <Text style={styles.id}>{item.id}</Text>
                   </View>
                   <Text style={styles.time}>{item.time}</Text>
                 </View>
                 <View style={styles.middle}>
                   <View>
-                    <Text style={styles.plan}>{item.title || 'New Joining'}</Text>
-                    <Text style={styles.sub}>{item.subtitle || `Membership - ${item.membership || ''}`}</Text>
+                    <Text style={styles.plan}>{item.title || 'Membership'}</Text>
+                    <Text style={styles.sub}>{item.subtitle || `${item.membership || ''}`}</Text>
                   </View>
                   <View style={styles.amountBox}>
                     <View style={styles.cashPill}>

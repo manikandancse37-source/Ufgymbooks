@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, Image, SafeAreaView, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Image, SafeAreaView, Text, TouchableOpacity, View } from "react-native";
 import { supabase } from "../lib/supabaseClient";
 
 export default function MemberDetailsRangeScreen() {
@@ -48,7 +48,10 @@ export default function MemberDetailsRangeScreen() {
             data={members}
             keyExtractor={(item) => String(item.member_id)}
             renderItem={({ item }) => (
-              <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 18, marginBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: "/memberDetails" as any, params: { memberId: String(item.member_id) } } as any)}
+              >
+                <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 18, marginBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
                 {/* Profile Image or Default Icon */}
                 {item["profile image"] ? (
                   <Image
@@ -68,14 +71,15 @@ export default function MemberDetailsRangeScreen() {
                   <Text style={{ fontWeight: '700', fontSize: 17, color: '#0B1B3A', marginBottom: 2 }}>
                     {item.name || `${item.first_name || ''} ${item.last_name || ''}`}
                   </Text>
-                  <Text style={{ color: '#64748B', fontSize: 13, marginBottom: 6 }}>#{item.member_code}</Text>
-                  <Text style={{ color: '#64748B', fontSize: 13, marginBottom: 6 }}>Expiry: <Text style={{ color: '#F59E0B', fontWeight: '700' }}>{item.expiry_date ? item.expiry_date.slice(0, 10) : '--'}</Text></Text>
+                  <Text style={{ color: '#64748B', fontSize: 13, marginBottom: 6 }}>{item.mobile}</Text>
+                  <Text style={{ color: '#64748B', fontSize: 13, marginBottom: 6 }}>Expiry: <Text style={{ fontWeight: '700' }}>{item.expiry_date ? item.expiry_date.slice(0, 10) : '--'}</Text></Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ color: '#64748B', fontSize: 13 }}>Amount</Text>
-                  <Text style={{ color: '#0B1B3A', fontWeight: '700', fontSize: 20, marginTop: 2 }}>{item.amount ?? '--'}</Text>
+                  <Text style={{ color: '#64748B', fontSize: 13 }}>Balance Amount</Text>
+                  <Text style={{ color: '#0B1B3A', fontWeight: '700', fontSize: 20, marginTop: 2 }}>{item.balance_amount ?? '--'}</Text>
                 </View>
               </View>
+              </TouchableOpacity>
             )}
           />
         )}

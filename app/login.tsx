@@ -3,12 +3,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { supabase } from "../lib/supabaseClient";
 
@@ -30,22 +30,22 @@ export default function LoginScreen() {
       alert("Password must be between 6 and 20 digits");
       return;
     }
-    const { data, error } = await supabase.rpc("app_login_v1", {
+    const { data, error } = await supabase.rpc("app_login_v2", {
       in_mobileno: email.trim(),
       in_password: password.trim(),
       in_ipaddress: "127.0.0.1",
     });
+    console.log()
     if (error) {
       alert(error);
     } else {
-      console.log(data)
-      const dataed = data.split('~');
-      if (dataed[0] === "0") {
-        await AsyncStorage.setItem("userid", dataed[dataed.length - 1]);
+      console.log(data.applicationuserid);
+      if (data.status == "0") {
+        await AsyncStorage.setItem("userid", data.applicationuserid);
         router.replace("/(tabs)");
       }
       else {
-        alert(dataed[1]);
+        alert(data.message);
         // router.replace("/(tabs)");
       }
     }
@@ -61,7 +61,7 @@ export default function LoginScreen() {
 
         <TextInput
           style={styles.input}
-          placeholder="Mobile NO"
+          placeholder="Mobile No"
           value={email}
           onChangeText={(text) => setEmail(text.replace(/[^0-9]/g, ''))}
           keyboardType="numeric"

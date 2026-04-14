@@ -6,8 +6,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Image, Keyboard, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View
+    Image, Keyboard, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView,
+    StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import RNPickerSelect from "react-native-picker-select";
 import { supabase } from "../../lib/supabaseClient";
@@ -25,7 +25,7 @@ const INITIAL_FORM = {
   phone:     "",
   email:     "",
   dob:       "",
-  gender:    "Male",
+  gender:    "",
   address:   "",
   city:      "",
   stateName: "",
@@ -109,6 +109,8 @@ export default function AddMemberScreen() {
       setForm({ ...INITIAL_FORM });
       setMembershipType(null);
       setCustomDays("");
+      setAvatar(null);
+      setAvatarBase64(null);
     }, [])
   );
 
@@ -184,11 +186,11 @@ export default function AddMemberScreen() {
   const membershipOptions = useMemo(() =>
     membershipData.map(item => ({
       label: `${item.membership_name} (${item.duration_days} days)`,
-      value: item.duration_days,
+      value: item.membership_type_id,
     })), [membershipData]);
 
   const selectedPlan = useMemo(() =>
-    membershipData.find(item => item.duration_days === membershipType),
+    membershipData.find(item => item.membership_type_id === membershipType),
     [membershipData, membershipType]);
 
   const isCustomDuration = selectedPlan?.duration_days === 1;
@@ -196,10 +198,27 @@ export default function AddMemberScreen() {
   /* ── Reset custom days when plan changes ── */
   useEffect(() => { setCustomDays(""); }, [membershipType]);
 
+  /* ── Keep a ref always pointing to latest form/state ── */
+  const formRef = useRef(form);
+  formRef.current = form;
+  const membershipTypeRef = useRef(membershipType);
+  membershipTypeRef.current = membershipType;
+  const customDaysRef = useRef(customDays);
+  customDaysRef.current = customDays;
+  const isCustomDurationRef = useRef(isCustomDuration);
+  isCustomDurationRef.current = isCustomDuration;
+  const avatarBase64Ref = useRef(avatarBase64);
+  avatarBase64Ref.current = avatarBase64;
+  const selectedPlanRef = useRef(selectedPlan);
+  selectedPlanRef.current = selectedPlan;
+
   /* ── Validation ── */
-  const validate = useCallback(() => {
+  const validate = () => {
     const { name, lastName, phone, email, address, city,
-            stateName, pincode, height, weight, emgName, emgPhone, amount } = form;
+            stateName, pincode, height, weight, emgName, emgPhone, amount } = formRef.current;
+    const mType = membershipTypeRef.current;
+    const cDays = customDaysRef.current;
+    const isCustom = isCustomDurationRef.current;
 
     if (!name) { alert("First name is required"); return false; }
     if (!lastName) { alert("Last name is required"); return false; }
@@ -210,19 +229,19 @@ export default function AddMemberScreen() {
     if (!city) { alert("City is required"); return false; }
     if (!stateName) { alert("State is required"); return false; }
     if (!pincode) { alert("Pincode is required"); return false; }
-    if (!membershipType) { alert("Membership type is required"); return false; }
+    if (!mType) { alert("Membership type is required"); return false; }
     if (!height) { alert("Height is required"); return false; }
     if (!weight) { alert("Weight is required"); return false; }
     if (!emgName) { alert("Emergency contact name is required"); return false; }
     if (!emgPhone) { alert("Emergency phone is required"); return false; }
     if (emgPhone.length < 10) { alert("Emergency phone must be at least 10 digits"); return false; }
-    if (isCustomDuration && !customDays) { alert("Enter number of days"); return false; }
+    if (isCustom && !cDays) { alert("Enter number of days"); return false; }
     if (!amount) { alert("Amount is required"); return false; }
     return true;
-  }, [form, membershipType, isCustomDuration, customDays]);
+  };
 
   /* ── Save ── */
-  const handleSave = useCallback(async () => {
+  const handleSave = async () => {
     if (!validate()) return;
     Keyboard.dismiss();
     setLoading(true);
@@ -234,69 +253,55 @@ export default function AddMemberScreen() {
         return;
       }
 
-
-      // Use base64 string for avatar
-      let avatarBase64String = avatarBase64;
+      const currentForm = formRef.current;
+      const currentAvatarBase64 = avatarBase64Ref.current;
+      const currentIsCustomDuration = isCustomDurationRef.current;
+      const currentCustomDays = customDaysRef.current;
+      const currentSelectedPlan = selectedPlanRef.current;
 
       const userIdNumber = Number(appUserId);
       if (Number.isNaN(userIdNumber)) {
         throw new Error("Invalid user id in storage");
       }
 
-      let durationDays = isCustomDuration
-        ? Number(customDays)
-        : selectedPlan?.duration_days;
+      // Custom days: only digits, default to 0 if empty/invalid
+      const customDaysNumber = currentIsCustomDuration
+        ? (Number(currentCustomDays.replace(/[^0-9]/g, "")) || 0)
+        : 0;
 
-      const { data,error } = await supabase.rpc("ufn_create_member_v3", {
+      const payload = {
         in_applicationuserid: userIdNumber,
-        in_first_name:        form.name,
-        in_last_name:         form.lastName,
-        in_gender:            form.gender,
-        in_dob:               form.dob || null,
-        in_phone:             form.phone,
-        in_email:             form.email,
-        in_address:           form.address,
-        in_city:              form.city,
-        in_state:             form.stateName,
-        in_pincode:           form.pincode,
-        in_membership_type:   durationDays,
-        in_height:            form.height ? Number(form.height) : null,
-        in_weight:            form.weight ? Number(form.weight) : null,
-        in_emg_name:          form.emgName,
-        in_emg_phone:         form.emgPhone,
-        in_profile_image:     avatarBase64String || null,
-        in_amount:            form.amount ? Number(form.amount) : null,
-      });
+        in_first_name:        currentForm.name,
+        in_last_name:         currentForm.lastName,
+        in_gender:            currentForm.gender,
+        in_dob:               currentForm.dob || null,
+        in_phone:             currentForm.phone,
+        in_email:             currentForm.email,
+        in_address:           currentForm.address,
+        in_city:              currentForm.city,
+        in_state:             currentForm.stateName,
+        in_pincode:           currentForm.pincode,
+        in_membership_type:   membershipTypeRef.current, 
+        in_height:            currentForm.height ? Number(currentForm.height) : null,
+        in_weight:            currentForm.weight ? Number(currentForm.weight) : null,
+        in_emg_name:          currentForm.emgName,
+        in_emg_phone:         currentForm.emgPhone,
+        in_profile_image:     currentAvatarBase64 || null,
+        in_amount:            currentForm.amount ? Number(currentForm.amount) : null,
+        in_status:            currentIsCustomDuration ? customDaysNumber : 0,
+      };
+
+      console.log("Submitting payload:", payload);
+
+      const { data, error } = await supabase.rpc("ufn_create_member", payload);
 
       if (error) throw error;
-      console.log({
-        in_applicationuserid: userIdNumber,
-        in_first_name:        form.name,
-        in_last_name:         form.lastName,
-        in_gender:            form.gender,
-        in_dob:               form.dob || null,
-        in_phone:             form.phone,
-        in_email:             form.email,
-        in_address:           form.address,
-        in_city:              form.city,
-        in_state:             form.stateName,
-        in_pincode:           form.pincode,
-        in_membership_type:   durationDays,
-        in_height:            form.height ? Number(form.height) : null,
-        in_weight:            form.weight ? Number(form.weight) : null,
-        in_emg_name:          form.emgName,
-        in_emg_phone:         form.emgPhone,
-        in_profile_image:     avatarBase64String || null,
-        in_amount:            form.amount ? Number(form.amount) : null,
-      });
       alert(data.message);
-      setForm({ ...INITIAL_FORM });   // ← reset all text fields
-      setAvatar(null);
-
-      setMembershipType(null);        // ← reset membership dropdown
-      setCustomDays("");              // ← reset custom days
+      setForm({ ...INITIAL_FORM });
       setAvatar(null);
       setAvatarBase64(null);
+      setMembershipType(null);
+      setCustomDays("");
       router.replace({ pathname: "/(tabs)", params: { refresh: "1" } });
 
     } catch (err: any) {
@@ -305,7 +310,7 @@ export default function AddMemberScreen() {
       setLoading(false);
       setUploading(false);
     }
-  }, [appUserId, form, isCustomDuration, customDays, selectedPlan, validate, router, avatar]);
+  };
 
   /* ── Render ── */
   return (
@@ -385,7 +390,7 @@ export default function AddMemberScreen() {
                   inputAndroid: { ...pickerStyles.inputAndroid, ...styles.input },
                   inputWeb: { ...pickerStyles.inputWeb, ...styles.input },
                 }}
-                placeholder={{ label: "Select Gender", value: null, color: "#0A1E5E" }}
+                placeholder={{ label: "Select Gender", value: "", color: "#0A1E5E" }}
               />
             </View>
             {Platform.OS === "web" ? (
@@ -436,7 +441,7 @@ export default function AddMemberScreen() {
                   inputAndroid: { ...pickerStyles.inputAndroid, ...styles.input },
                   inputWeb: { ...pickerStyles.inputWeb, ...styles.input },
                 }}
-                placeholder={{ label: "Select State", value: null, color: "#0A1E5E" }}
+                placeholder={{ label: "Select State", value: "", color: "#0A1E5E" }}
               />
             </View>
             <View style={styles.dropdownWrapper}>
@@ -450,14 +455,16 @@ export default function AddMemberScreen() {
                   inputAndroid: { ...pickerStyles.inputAndroid, ...styles.input },
                   inputWeb: { ...pickerStyles.inputWeb, ...styles.input },
                 }}
-                placeholder={{ label: "Select City", value: null, color: "#0A1E5E" }}
+                placeholder={{ label: "Select City", value: "", color: "#0A1E5E" }}
               />
             </View>
+            {/* Membership Type Dropdown */}
             <View style={styles.dropdownWrapper}>
               <RNPickerSelect
                 onValueChange={val => {
+                  if (val === membershipType) return;
                   setMembershipType(val);
-                  const selected = membershipData.find(item => item.duration_days === val);
+                  const selected = membershipData.find(item => item.membership_type_id === val);
                   if (selected && selected.entry_fee) {
                     setForm(prev => ({ ...prev, amount: String(selected.entry_fee) }));
                   } else {
@@ -480,7 +487,10 @@ export default function AddMemberScreen() {
                 placeholder="Enter number of days"
                 keyboardType="numeric"
                 value={customDays}
-                onChangeText={setCustomDays}
+                onChangeText={text => {
+                  const numeric = text.replace(/[^0-9]/g, "");
+                  setCustomDays(numeric);
+                }}
                 maxLength={4}
               />
             )}

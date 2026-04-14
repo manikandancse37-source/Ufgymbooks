@@ -7,6 +7,7 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { DateRange } from 'react-date-range';
 import {
+  Image,
   Platform,
   ScrollView,
   StatusBar,
@@ -38,6 +39,8 @@ export default function HomeScreen() {
       key: 'selection',
     },
   ]);
+  const [membersWithBalance, setMembersWithBalance] = useState<any[]>([]);
+  const [loadingMembersBalance, setLoadingMembersBalance] = useState(false);
 
   const navigate = (path: string, params?: Record<string, string>) => {
     router.push({ pathname: path as any, params });
@@ -47,6 +50,7 @@ export default function HomeScreen() {
     useCallback(() => {
       fetchDashboard();
       fetchBirthdays();
+      fetchMembersWithBalance();
       fetchQuickReports(fromDate, toDate);
     }, [fromDate, toDate])
   );
@@ -106,6 +110,7 @@ export default function HomeScreen() {
   const fetchBirthdays = async () => {
     setLoadingBirthdays(true);
     const { data, error } = await supabase.rpc("ufn_get_today_birthdays");
+    console.log(data);
     if (error) {
       console.log("Birthday error:", error);
       setBirthdays([]);
@@ -114,6 +119,20 @@ export default function HomeScreen() {
     }
     setBirthdays(data || []);
     setLoadingBirthdays(false);
+  };
+
+  const fetchMembersWithBalance = async () => {
+    setLoadingMembersBalance(true);
+    const { data, error } = await supabase.rpc("fn_memberswinbalacne");
+    console.log(data);
+    if (error) {
+      console.log("Members with balance error:", error);
+      setMembersWithBalance([]);
+      setLoadingMembersBalance(false);
+      return;
+    }
+    setMembersWithBalance(data || []);
+    setLoadingMembersBalance(false);
   };
 
   return (
@@ -166,30 +185,46 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.singleRow}>
-          <WhiteCard label="Expirie" value={dashboard["expired_members"] || 0}
+          <WhiteCard label="Today's Leads" value={dashboard["expired_members"] || 0}
             onPress={() => navigate("/(tabs)/member", { userId: "3" })} />
         </View>
 
         {/* Today's Birthdays Section - moved below grid */}
         <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
-          <Text style={{ fontSize: 16, fontWeight: "600", marginBottom: 8 }}>Today&apos;s Birthdays</Text>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <Text style={{ fontSize: 16, fontWeight: "600" }}>Birthdays Today</Text>
+            <Ionicons name="gift" size={24} color="#F59E0B" />
+          </View>
           {loadingBirthdays ? (
             <Text style={{ color: "#64748B" }}>Loading...</Text>
           ) : birthdays.length === 0 ? (
             <Text style={{ color: "#64748B" }}>No birthdays today.</Text>
           ) : (
-            birthdays.map((b: any, idx: number) => (
-              <View key={b.member_id || idx} style={{ backgroundColor: "#fff", borderRadius: 10, padding: 12, marginBottom: 8, flexDirection: "row", alignItems: "center" }}>
-                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "#E6EAF0", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
-                  <Ionicons name="person-circle" size={40} color="#CBD5E1" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 15, fontWeight: "600" }}>{b.name}</Text>
-                  <Text style={{ color: "#64748B", fontSize: 13 }}>DOB: {b.date_of_birth}</Text>
-                </View>
-                <Ionicons name="cafe-outline" size={28} color="#F59E0B" style={{ marginLeft: 8 }} />
-              </View>
-            ))
+            <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 16 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {birthdays.map((b: any, idx: number) => (
+                  <TouchableOpacity
+                    key={b.member_id || idx}
+                    onPress={() => router.push({ pathname: "/memberDetails" as any, params: { memberId: String(b.member_id) } } as any)}
+                    style={{ alignItems: "center", marginRight: 20 }}
+                  >
+                    <View style={{ position: "relative" }}>
+                      <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: "#E6EAF0", alignItems: "center", justifyContent: "center" }}>
+                        {b.profile_image ? (
+                          <Image 
+                            source={{ uri: b.profile_image.startsWith('data:image') ? b.profile_image : `data:image/png;base64,${b.profile_image}` }}
+                            style={{ width: 60, height: 60, borderRadius: 30 }}
+                          />
+                        ) : (
+                          <Ionicons name="person-circle" size={60} color="#CBD5E1" />
+                        )}
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 12, fontWeight: "600", marginTop: 8, color: "#0B1B3A" }}>{b.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
           )}
         </View>
 
@@ -218,7 +253,7 @@ export default function HomeScreen() {
           </View>
         </View> */}
         <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
-          <Text style={{ color: '#2563EB', fontWeight: '700', fontSize: 15, marginBottom: 8 }}>Quick Reports</Text>
+          <Text style={{ fontSize: 16, marginBottom: 8 , fontWeight: "600" }}>Quick Reports</Text>
           {/* Date Range Picker UI */}
           {Platform.OS === 'web' ? (
             <View style={{ marginBottom: 8 }}>
@@ -325,6 +360,14 @@ export default function HomeScreen() {
                       <Text style={{ color: '#222', fontWeight: '700', fontSize: 20, marginTop: 2 }}>{quickReports["New Members"] ?? '--'}</Text>
                     </TouchableOpacity>
                   </View>
+                   <View style={{ flex: 1 }}>
+                    <TouchableOpacity onPress={() => navigate("/allTimeBalanceReport", { fromDate: fromDate.toISOString().split('T')[0], toDate: toDate.toISOString().split('T')[0] })}>
+                      <Text style={{ color: '#64748B', fontSize: 13, textDecorationLine: 'underline' }}>All Time Balance</Text>
+                      <Text style={{ color: '#222', fontWeight: '700', fontSize: 20, marginTop: 2 }}>{quickReports["All Time Balance"] ?? '--'}</Text>
+                    </TouchableOpacity>
+                  </View>                 
+                </View>
+                <View style={{ flexDirection: 'row' }}>
                   <View style={{ flex: 1 }}>
                     <TouchableOpacity onPress={() =>
                       router.push({
@@ -334,14 +377,6 @@ export default function HomeScreen() {
                     }>
                       <Text style={{ color: '#64748B', fontSize: 13, textDecorationLine: 'underline' }}>Total Members</Text>
                       <Text style={{ color: '#222', fontWeight: '700', fontSize: 20, marginTop: 2 }}>{quickReports["Total Members"] ?? '--'}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                <View style={{ flexDirection: 'row' }}>
-                  <View style={{ flex: 1 }}>
-                    <TouchableOpacity onPress={() => navigate("/allTimeBalanceReport", { fromDate: fromDate.toISOString().split('T')[0], toDate: toDate.toISOString().split('T')[0] })}>
-                      <Text style={{ color: '#64748B', fontSize: 13, textDecorationLine: 'underline' }}>All Time Balance</Text>
-                      <Text style={{ color: '#222', fontWeight: '700', fontSize: 20, marginTop: 2 }}>{quickReports["All Time Balance"] ?? '--'}</Text>
                     </TouchableOpacity>
                   </View>
                   <View style={{ flex: 1 }}>
@@ -359,15 +394,64 @@ export default function HomeScreen() {
         </View>
 
         {/* Members with balance */}
-        {/* <View style={styles.balanceCard}>
-          <View style={styles.balanceHeader}>
-            <Text style={styles.section}>Members with balance</Text>
+        <View style={{ marginHorizontal: 16, marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={{ fontSize: 16, fontWeight: "600" }}>Members with balance</Text>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>0</Text>
+              <Text style={styles.badgeText}>{membersWithBalance.length}</Text>
             </View>
           </View>
-          <Text style={styles.muted}>No member with balance</Text>
-        </View> */}
+          {loadingMembersBalance ? (
+            <Text style={{ color: "#64748B" }}>Loading...</Text>
+          ) : membersWithBalance.length === 0 ? (
+            <Text style={{ color: "#64748B" }}>No member with balance</Text>
+          ) : (
+            membersWithBalance.slice(0, 2).map((member: any, idx: number) => (
+              <TouchableOpacity
+                key={member.member_id || idx}
+                onPress={() => router.push({ pathname: "/memberDetails" as any, params: { memberId: String(member.member_id) } } as any)}
+              >
+                <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 12, marginBottom: 8 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', flex: 1 }}>
+                      <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: "#E6EAF0", alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                        {member.profile_image ? (
+                          <Image 
+                            source={{ uri: member.profile_image.startsWith('data:image') ? member.profile_image : `data:image/png;base64,${member.profile_image}` }}
+                            style={{ width: 48, height: 48, borderRadius: 24 }}
+                          />
+                        ) : (
+                          <Ionicons name="person-circle" size={48} color="#CBD5E1" />
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontWeight: "600", color: "#0B1B3A" }}>{member.name} {member.last_name}</Text>
+                        <Text style={{ color: "#64748B", fontSize: 12, marginTop: 2 }}>{member.mobile}</Text>
+                      </View>
+                    </View>
+                  </View>
+                  <View style={{ borderTopWidth: 1, borderTopColor: "#E5E7EB", paddingTop: 8 }}>
+                    <Text style={{ fontSize: 16, fontWeight: "600", color: member.balance_amount > 0 ? "#EF4444" : "#EF4444" }}>Balance : ₹{member.balance_amount}</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+          <View style={{ marginTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            {membersWithBalance.length > 2 && (
+              <TouchableOpacity 
+                onPress={() => navigate("/(tabs)/member", { userId: "7" })}
+              >
+                <Text style={{ color: "#64748B", fontSize: 14 }}>and <Text style={{ color: '#0B1B3A', fontWeight: '600' }}>{membersWithBalance.length - 2} more</Text></Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity 
+              onPress={() => navigate("/(tabs)/member", { userId: "7" })}
+            >
+              <Text style={{ color: '#2563EB', fontWeight: '600' }}>See All</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );

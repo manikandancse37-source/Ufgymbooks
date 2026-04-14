@@ -1,7 +1,7 @@
 
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, Image, SafeAreaView, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Image, SafeAreaView, Text, TouchableOpacity, View } from "react-native";
 import { supabase } from "../lib/supabaseClient";
 
 export default function AllTimeBalanceReportScreen() {
@@ -9,7 +9,7 @@ export default function AllTimeBalanceReportScreen() {
   const { fromDate, toDate } = useLocalSearchParams();
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<any[]>([]);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchBalance = async () => {
@@ -55,7 +55,10 @@ export default function AllTimeBalanceReportScreen() {
             keyExtractor={(item, idx) => String(item.member_id || idx)}
             ListEmptyComponent={<Text style={{ color: '#64748B', fontSize: 16, textAlign: 'center', marginTop: 32 }}>No records found</Text>}
             renderItem={({ item }) => (
-              <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 18, marginBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: "/memberDetails" as any, params: { memberId: String(item.member_id) } } as any)}
+              >
+                <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 18, marginBottom: 14, flexDirection: 'row', alignItems: 'center' }}>
                 {/* Profile Image or Default Icon */}
                 {item["profile image"] ? (
                   <Image
@@ -80,9 +83,12 @@ export default function AllTimeBalanceReportScreen() {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={{ color: '#64748B', fontSize: 13 }}>Balance</Text>
-                  <Text style={{ color: '#0B1B3A', fontWeight: '700', fontSize: 20, marginTop: 2 }}>{item.balance_amount !== undefined && item.balance_amount !== null ? `₹${item.balance_amount}` : '--'}</Text>
+                  <Text style={{ color: '#0B1B3A', fontWeight: '700', fontSize: 20, marginTop: 2 }}>
+                    {item.balance_amount !== undefined && item.balance_amount !== null ? `₹${item.balance_amount}` : '--'}
+                  </Text>
                 </View>
               </View>
+              </TouchableOpacity>
             )}
           />
         )}
